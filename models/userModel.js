@@ -13,6 +13,10 @@ const userSchema = mongoose.Schema({
     password: {
         type: String,
         required: [true, "Please add the password"],
+    },
+    watchlist: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MovieDeckWatchLists',
     }
 }, 
     {
@@ -20,4 +24,4 @@ const userSchema = mongoose.Schema({
     }
 );
 
-module.exports = mongoose.model("UserDetails", userSchema);
+module.exports = mongoose.model("MovieDeckUserInfo", userSchema);

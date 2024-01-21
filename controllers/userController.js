@@ -1,72 +1,76 @@
-const asyncHandler = require('express-async-handler')
 const userModel = require("../models/userModel");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+const watchListModel = require("../models/watchLaterModel");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
-const userRegister = asyncHandler(async (req, res)=> {
-    const {username, email, password} = req.body;
-    if (!username || !email || !password) {
-        res.status(400).send("All fields are a important");
-    }
-    const userAvailable = await userModel.findOne({email});
-    if (userAvailable) {
-        res.status(400).send("User already available");
-    }
-    // Hash password creating
-    const hashPassword = await bcrypt.hash(password, 10);
+const getRegisterDetails = async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        
+        if (!username || !email || !password) {
+            return res.status(400).json("All fields are required");
+        }
 
-    const newUser = await userModel.create({
-        username,
-        email,
-        password: hashPassword,
-    })
-    const accessToken = jwt.sign({
-        user: {
+        const userAvailable = await userModel.findOne({ email });
+
+        if (userAvailable) {
+            return res.status(400).json("User already available");
+        }
+
+        const hashPassword = await bcrypt.hash(password, 10);
+        const newUser = await userModel.create({
             username,
             email,
             password: hashPassword,
+        });
+
+        if (newUser) {
+            const newWatchlist = await watchListModel.create({
+                user: newUser._id,
+                details: [],
+            });
+
+            return res.status(201).json({
+                _id: newUser.id,
+                email: newUser.email,
+                watchlist: newWatchlist._id,
+            });
+        } else {
+            return res.status(400).json("User Data invalid");
         }
+    } catch (error) {
+        console.error('Error in getRegisterDetails:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
-    , process.env.ACCESS_TOKEN_SECRET,
-    {expiresIn: "500m"}
-    )
-    if (newUser) {
-        res.status(201).json({_id: newUser.id, email: newUser.email, token: accessToken});
-    } else {
-        res.status(400).send("User Data is not valid")
-    }
-    res.status(400).json({username, email, password});
-})
+};
 
-const userLogin = asyncHandler(async (req, res)=> {
-    const {email, password} = req.body;
-    if (!email || !password) {
-        res.status(400).send("All fields are mandatory!");
-    }
-    const user = await userModel.findOne({ email });
-    if (user && (await bcrypt.compare(password, user.password))) {
-        const accessToken = jwt.sign({
-            user: {
-                username: user.username,
-                email: user.email,
-                id: user.id,
-            }
+const getLogInDetails = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json("Email and Password required");
         }
-        , process.env.ACCESS_TOKEN_SECRET,
-        {expiresIn: "500m"}
-        )
-        res.status(200).json({accessToken})
-    } else {
-        res.status(401).send("email or password is not valid")
+
+        const user = await userModel.findOne({ email });
+
+        if (user && (await bcrypt.compare(password, user.password))) {
+            const accessToken = jwt.sign({
+                user: {
+                    username: user.username,
+                    email: user.email,
+                    id: user.id,
+                }
+            }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "50m" });
+
+            return res.status(200).json({ accessToken, email, userId: user._id });
+        } else {
+            return res.status(401).json("Email or Password invalid");
+        }
+    } catch (error) {
+        console.error('Error in getLoginDetails:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
-    res.json({message: "login users"})
-})
+};
 
-
-// Private 
-const getCurrentUser = asyncHandler(async (req, res)=> {
-    console.log("value came ",req.user);
-    res.json(req.user );
-})
-
-module.exports = { userRegister, userLogin, getCurrentUser }
+module.exports = { getRegisterDetails, getLogInDetails };
